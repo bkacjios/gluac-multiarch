@@ -4,7 +4,6 @@ solution "gluac"
 	location ( os.get() .."-".. _ACTION )
 	flags { "Symbols", "NoEditAndContinue", "NoPCH", "StaticRuntime", "EnableSSE" }
 	targetdir ( "lib/" .. os.get() .. "/" )
-	includedirs { "include/GarrysMod", "include/" .. os.get(), "/usr/local/include/luajit-2.0/" }
 	platforms{ "x32" }
 	libdirs { "library/" .. os.get() }
 	if os.get() == "linux" then
@@ -25,5 +24,5 @@ solution "gluac"
 	
 	project "gluac"
 		defines {}
-		files { "src/**.*", "include/**.*" }
+		files { "src/**.*" }
 		kind "ConsoleApp"

@@ -118,6 +118,9 @@ static int pmain(lua_State* L)
 	int argc=s->argc;
 	char** argv=s->argv;
 	int i;
+
+	lua_pop(L,1);
+
 	if (!lua_checkstack(L,argc)) fatal("too many input files");
 	for (i=0; i<argc; i++)
 	{
@@ -135,21 +138,47 @@ static int pmain(lua_State* L)
 			lua_pushvalue(L, -3);
 			lua_pcall(L, 1, 1, 0);
 
+			{
 			size_t len;
 			char* bytecode = (char*) lua_tolstring(L, -1, &len);
 
 			fwrite(bytecode,len,1,D);
+			}
 
 			lua_pop(L,3);
 
 			if (ferror(D)) cannot("write");
 			if (fclose(D)) cannot("close");
-		}
+		}/* else {
+			printf("%d\n", lua_gettop(L));
+			if(lua_pcall(L, 0, 0, 0) != 0)
+				fatal(lua_tostring(L,-1));
+		}*/
+
 	}
 
 	/*f=combine(L,argc);
 	if (listing) luaU_print(f,listing>1);*/
 	return 0;
+}
+
+int glua_print(lua_State* L)
+{
+	int i;
+	for (i=1; i <= lua_gettop(L); i++) {
+		if (i>1)
+			printf("\t");
+
+		lua_getglobal(L, "tostring");
+		lua_pushvalue(L, i);
+		lua_call(L, 1, 1);
+
+		printf("%s", lua_tostring(L,-1));
+
+		lua_pop(L,1);
+	}
+	printf("\n");
+    return 0;
 }
 
 int main(int argc, char* argv[])
@@ -164,18 +193,21 @@ int main(int argc, char* argv[])
 		printf("Error loading lua_shared\n");
 		return 1;
 	}
-
-	lua_State* L;
-	struct Smain s;
-	int i=doargs(argc,argv);
-	argc-=i; argv+=i;
-	if (argc<=0) usage("no input files given");
-	L=lua_open();
-	luaL_openlibs(L);
-	if (L==NULL) fatal("not enough memory for state");
-	s.argc=argc;
-	s.argv=argv;
-	if (lua_cpcall(L,pmain,&s)!=0) fatal(lua_tostring(L,-1));
-	lua_close(L);
+	
+	{
+		lua_State* L;
+		struct Smain s;
+		int i=doargs(argc,argv);
+		argc-=i; argv+=i;
+		if (argc<=0) usage("no input files given");
+		L=lua_open();
+		luaL_openlibs(L);
+		//lua_register(L, "print", glua_print);
+		if (L==NULL) fatal("not enough memory for state");
+		s.argc=argc;
+		s.argv=argv;
+		if (lua_cpcall(L,pmain,&s)!=0) fatal(lua_tostring(L,-1));
+		lua_close(L);
+	}
 	return EXIT_SUCCESS;
 }
