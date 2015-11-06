@@ -3,7 +3,7 @@ solution "gluac"
 	language "C"
 	location ( os.get() .."-".. _ACTION )
 	flags { "Symbols", "NoEditAndContinue", "NoPCH", "StaticRuntime", "EnableSSE" }
-	targetdir ( "lib/" .. os.get() .. "/" )
+	targetdir ( "bin/" .. os.get() .. "/" )
 	platforms{ "x32" }
 	libdirs { "library/" .. os.get() }
 	if os.get() == "linux" then

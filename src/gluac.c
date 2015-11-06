@@ -17,48 +17,44 @@
 lua_All_functions LuaFunctions;
 
 #define PROGNAME        "gluac"          /* default program name */
-#define OUTPUT          PROGNAME ".out" /* default output file */
+#define OUTPUT          PROGNAME ".luac" /* default output file */
 
-static int listing=0;                   /* list bytecodes? */
 static int dumping=1;                   /* dump bytecodes? */
-static int stripping=0;                 /* strip debug information? */
 static char Output[]={ OUTPUT };        /* default output file name */
 static const char* output=Output;       /* actual output file name */
 static const char* progname=PROGNAME;   /* actual program name */
 
 static void fatal(const char* message)
 {
- fprintf(stderr,"%s: %s\n",progname,message);
- exit(EXIT_FAILURE);
+	fprintf(stderr,"%s: %s\n",progname,message);
+	exit(EXIT_FAILURE);
 }
 
 static void cannot(const char* what)
 {
- fprintf(stderr,"%s: cannot %s %s: %s\n",progname,what,output,strerror(errno));
- exit(EXIT_FAILURE);
+	fprintf(stderr,"%s: cannot %s %s: %s\n",progname,what,output,strerror(errno));
+	exit(EXIT_FAILURE);
 }
 
 static void usage(const char* message)
 {
- if (*message=='-')
-  fprintf(stderr,"%s: unrecognized option " LUA_QS "\n",progname,message);
- else
-  fprintf(stderr,"%s: %s\n",progname,message);
- fprintf(stderr,
- "usage: %s [options] [filenames].\n"
- "Available options are:\n"
- "  -        process stdin\n"
- "  -l       list\n"
- "  -o name  output to file " LUA_QL("name") " (default is \"%s\")\n"
- "  -p       parse only\n"
- "  -s       strip debug information\n"
- "  -v       show version information\n"
- "  --       stop handling options\n",
- progname,Output);
- exit(EXIT_FAILURE);
+	if (*message=='-')
+		fprintf(stderr,"%s: unrecognized option " LUA_QS "\n",progname,message);
+	else
+		fprintf(stderr,"%s: %s\n",progname,message);
+	fprintf(stderr,
+	"usage: %s [options] [filenames].\n"
+	"Available options are:\n"
+	"  -        process stdin\n"
+	"  -o name  output to file " LUA_QL("name") " (default is \"%s\")\n"
+	"  -p       parse only\n"
+	"  -v       show version information\n"
+	"  --       stop handling options\n",
+	progname,Output);
+	exit(EXIT_FAILURE);
 }
 
-#define IS(s)   (strcmp(argv[i],s)==0)
+#define IS(s) (strcmp(argv[i],s)==0)
 
 static int doargs(int argc, char* argv[])
 {
@@ -77,8 +73,6 @@ static int doargs(int argc, char* argv[])
 		}
 		else if (IS("-"))                     /* end of options; use stdin */
 			break;
-		else if (IS("-l"))                    /* list */
-			++listing;
 		else if (IS("-o"))                    /* output file */
 		{
 			output=argv[++i];
@@ -87,14 +81,12 @@ static int doargs(int argc, char* argv[])
 		}
 		else if (IS("-p"))                    /* parse only */
 			dumping=0;
-		else if (IS("-s"))                    /* strip debug information */
-			stripping=1;
 		else if (IS("-v"))                    /* show version */
 			++version;
 		else                                  /* unknown option */
 			usage(argv[i]);
 	}
-	if (i==argc && (listing || !dumping))
+	if (i==argc && !dumping)
 	{
 		dumping=0;
 		argv[--i]=Output;
@@ -111,6 +103,30 @@ struct Smain {
 	int argc;
 	char** argv;
 };
+
+typedef struct {
+    size_t *len;
+    char **data;
+} wdata;
+
+int write_dump(lua_State *L, const void* p, size_t sz, void* ud)
+{
+	wdata *wd = (wdata *)ud;
+
+	char *newData = (char *)realloc(*(wd->data), (*(wd->len)) + sz);
+
+	if(newData)
+	{
+		memcpy(newData + (*(wd->len)), p, sz);
+		*(wd->data) = newData;
+		*(wd->len) += sz;
+	} else {
+		free(newData);
+		return 1;
+	}
+
+	return 0;
+}
 
 static int pmain(lua_State* L)
 {
@@ -132,33 +148,21 @@ static int pmain(lua_State* L)
 			FILE* D= (output==NULL) ? stdout : fopen(output,(i > 0 ? "ab" : "wb"));
 			if (D==NULL) cannot("open");
 
-			lua_getglobal(L, "string");
-			lua_pushstring(L, "dump");
-			lua_gettable(L, -2);
-			lua_pushvalue(L, -3);
-			lua_pcall(L, 1, 1, 0);
+			char* bytecode = 0L;
+			size_t len = 0;
+			wdata wd = {&len, &bytecode};
 
-			{
-			size_t len;
-			char* bytecode = (char*) lua_tolstring(L, -1, &len);
+			if(lua_dump(L, write_dump, &wd)) fatal("failed to dump bytecode");
 
 			fwrite(bytecode,len,1,D);
-			}
 
 			lua_pop(L,3);
 
 			if (ferror(D)) cannot("write");
 			if (fclose(D)) cannot("close");
-		}/* else {
-			printf("%d\n", lua_gettop(L));
-			if(lua_pcall(L, 0, 0, 0) != 0)
-				fatal(lua_tostring(L,-1));
-		}*/
+		}
 
 	}
-
-	/*f=combine(L,argc);
-	if (listing) luaU_print(f,listing>1);*/
 	return 0;
 }
 
